@@ -4,6 +4,11 @@ import { CircleMarker, GeoJSON, MapContainer, Marker, TileLayer, useMap, useMapE
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
 import type { MapaPonto, Pergunta, Respondente } from '../types'
 import malha from '../data/regioes_pesquisa.json'
+import {
+  REGIOES_INFO,
+  bairroPertenceALista,
+  infoRegiao,
+} from '../data/regioes_bairros'
 import { formatPct, formatVal } from './BarraHorizontal'
 import { pct1 } from '../lib/pct'
 import 'leaflet/dist/leaflet.css'
@@ -96,15 +101,56 @@ function numeroRegiao(r: string) {
   return r.replace(/\D/g, '')
 }
 
-function MapaAjuste() {
+function anelCentroid(coords: number[][]): [number, number] {
+  let sx = 0
+  let sy = 0
+  let n = 0
+  for (const pt of coords) {
+    sx += pt[0]
+    sy += pt[1]
+    n++
+  }
+  return [sy / n, sx / n]
+}
+
+function featureCentroid(geom: Geometry): [number, number] | null {
+  if (geom.type === 'Polygon') return anelCentroid(geom.coordinates[0])
+  if (geom.type === 'MultiPolygon') {
+    let melhor = geom.coordinates[0][0]
+    let melhorN = 0
+    for (const poly of geom.coordinates) {
+      if (poly[0].length > melhorN) {
+        melhorN = poly[0].length
+        melhor = poly[0]
+      }
+    }
+    return anelCentroid(melhor)
+  }
+  return null
+}
+
+const BAIRRO_CENTROS = BAIRROS.features
+  .map((f) => {
+    const c = featureCentroid(f.geometry)
+    if (!c) return null
+    return { id: f.properties.id, bairro: f.properties.bairro, regiao: f.properties.regiao, centro: c }
+  })
+  .filter(Boolean) as { id: number; bairro: string; regiao: string | null; centro: [number, number] }[]
+
+function MapaAjuste({ regiaoFoco }: { regiaoFoco: string }) {
   const map = useMap()
   useEffect(() => {
-    const bounds = L.geoJSON(MUNICIPIO).getBounds()
-    map.fitBounds(bounds, { padding: [10, 10] })
+    const fonte =
+      regiaoFoco && REGIOES.features.some((f) => f.properties.regiao === regiaoFoco)
+        ? REGIOES.features.filter((f) => f.properties.regiao === regiaoFoco)
+        : MUNICIPIO.features
+    const bounds = L.geoJSON({ type: 'FeatureCollection', features: fonte } as FeatureCollection).getBounds()
+    if (!bounds.isValid()) return
+    map.fitBounds(bounds, { padding: [28, 28], maxZoom: regiaoFoco ? 13.5 : 12 })
     const t1 = window.setTimeout(() => map.invalidateSize(), 50)
     const t2 = window.setTimeout(() => {
       map.invalidateSize()
-      map.fitBounds(bounds, { padding: [10, 10] })
+      map.fitBounds(bounds, { padding: [28, 28], maxZoom: regiaoFoco ? 13.5 : 12 })
     }, 300)
     const onResize = () => map.invalidateSize()
     window.addEventListener('resize', onResize)
@@ -113,7 +159,7 @@ function MapaAjuste() {
       window.clearTimeout(t2)
       window.removeEventListener('resize', onResize)
     }
-  }, [map])
+  }, [map, regiaoFoco])
   return null
 }
 
@@ -137,8 +183,18 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
   const [hover, setHover] = useState<string | null>(null)
   const [mostrarPontos, setMostrarPontos] = useState(false)
   const [zoom, setZoom] = useState(11)
+  const [regiaoVista, setRegiaoVista] = useState(REGIOES_INFO[0]?.id ?? 'Região 1')
 
   const pergunta = indicadores.find((p) => p.id === perguntaId)
+  const regiaoAtual = infoRegiao(regiaoVista) ?? REGIOES_INFO[0]
+  const bairrosOficiais = regiaoAtual?.bairros ?? []
+
+  const rotulosBairros = useMemo(() => {
+    return BAIRRO_CENTROS.filter((b) => {
+      if (b.regiao === regiaoVista) return true
+      return bairroPertenceALista(b.bairro, bairrosOficiais)
+    })
+  }, [regiaoVista, bairrosOficiais])
 
   const opcoes = useMemo(() => {
     const uniq = (k: keyof Filtros) =>
@@ -218,12 +274,14 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
 
   function estiloRegiao(reg: string): L.PathOptions {
     const sel = reg === regA ? COR_A : reg === regB ? COR_B : null
+    const foco = reg === regiaoVista
+    const dim = reg !== regiaoVista
     return {
       fillColor: corDe(reg),
-      fillOpacity: hover === reg ? 0.92 : 0.78,
-      color: sel ?? '#1a2140',
-      weight: sel ? 3.5 : hover === reg ? 2.2 : 1.2,
-      opacity: sel ? 1 : 0.55,
+      fillOpacity: dim ? 0.22 : hover === reg ? 0.92 : 0.78,
+      color: sel ?? (foco ? regiaoAtual?.cor ?? '#1a2140' : '#1a2140'),
+      weight: sel ? 3.5 : foco ? 3 : hover === reg ? 2.2 : 1,
+      opacity: dim ? 0.25 : sel ? 1 : 0.55,
     }
   }
 
@@ -267,6 +325,37 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
   return (
     <div className="mr-layout">
       <aside className="mr-side">
+        <section className="mr-card mr-regiao-card">
+          <label className="mr-field">
+            Região
+            <select value={regiaoVista} onChange={(e) => setRegiaoVista(e.target.value)}>
+              {REGIOES_INFO.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.titulo}
+                </option>
+              ))}
+            </select>
+          </label>
+          {regiaoAtual && (
+            <div className="mr-regiao-desc">
+              <div className="mr-regiao-head" style={{ background: regiaoAtual.cor, color: regiaoAtual.corTexto }}>
+                <span className="mr-regiao-pill">{regiaoAtual.titulo}</span>
+                <span className="mr-regiao-count">
+                  {regiaoAtual.bairros.length} bairro{regiaoAtual.bairros.length === 1 ? '' : 's'}
+                </span>
+              </div>
+              <p className="mr-regiao-intro">
+                Composta por {regiaoAtual.bairros.length} bairros:
+              </p>
+              <ul className="mr-regiao-lista">
+                {regiaoAtual.bairros.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+
         <section className="mr-card">
           <label className="mr-field">
             Indicador
@@ -449,7 +538,7 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
       <div className="map-frame mr-map">
         {modoToggle}
         <MapContainer center={[-12.7, -38.3]} zoom={11} zoomSnap={0.5} scrollWheelZoom style={{ height: '100%', width: '100%' }}>
-          <MapaAjuste />
+          <MapaAjuste regiaoFoco={regiaoVista} />
           <ZoomWatch onZoom={setZoom} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -462,12 +551,28 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
             interactive={false}
           />
           <GeoJSON
+            key={`bairros-${regiaoVista}`}
             data={BAIRROS}
             style={(f) => {
               const p = (f as Feature<Geometry, BairroProps>).properties
-              return p.regiao
-                ? { color: '#ffffff', weight: 0.7, opacity: 0.8, fillOpacity: 0 }
-                : { color: '#8a92ae', weight: 0.8, opacity: 0.9, dashArray: '3 3', fillColor: SEM_REGIAO, fillOpacity: 0.45 }
+              const naFoco =
+                p.regiao === regiaoVista || bairroPertenceALista(p.bairro, bairrosOficiais)
+              if (!p.regiao && !naFoco) {
+                return {
+                  color: '#8a92ae',
+                  weight: 0.6,
+                  opacity: 0.35,
+                  dashArray: '3 3',
+                  fillColor: SEM_REGIAO,
+                  fillOpacity: 0.15,
+                }
+              }
+              return {
+                color: naFoco ? '#1a2140' : '#ffffff',
+                weight: naFoco ? 1.2 : 0.5,
+                opacity: naFoco ? 0.95 : 0.35,
+                fillOpacity: 0,
+              }
             }}
             onEachFeature={(f, layer) => {
               const p = f.properties as BairroProps
@@ -476,7 +581,6 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
                 `<span class="mr-tt-meta">${p.n_pontos} entrevista${p.n_pontos === 1 ? '' : 's'}</span>` +
                 (p.nomes ? `<br/><span class="mr-tt-meta">Bairro informado: ${p.nomes}</span>` : '')
 
-              // Um único card no toque (popup). Tooltip só no hover do desktop.
               const soToque =
                 L.Browser.mobile ||
                 (typeof window !== 'undefined' && window.matchMedia('(hover: none), (pointer: coarse)').matches)
@@ -501,8 +605,10 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
                 click: (e) => {
                   L.DomEvent.stopPropagation(e)
                   layer.closeTooltip()
-                  if (p.regiao) escolherRef.current(p.regiao)
-                  // bindPopup já abre o card; openPopup reforça no mobile sem duplicar
+                  if (p.regiao) {
+                    setRegiaoVista(p.regiao)
+                    escolherRef.current(p.regiao)
+                  }
                   if (soToque) layer.openPopup(e.latlng)
                 },
               })
@@ -513,10 +619,23 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
             interactive={false}
             style={{ color: '#1a2140', weight: 2.2, opacity: 0.85, fill: false }}
           />
+          {rotulosBairros.map((b) => (
+            <Marker
+              key={`bl-${b.id}-${regiaoVista}`}
+              position={b.centro}
+              interactive={false}
+              icon={L.divIcon({
+                className: 'mr-bairro-label-wrap',
+                html: `<span class="mr-bairro-label">${b.bairro}</span>`,
+                iconSize: [0, 0],
+              })}
+            />
+          ))}
           {mostrarPontos &&
             filtradosIdx.map((i) => {
               const p = pontos[i]
               if (!p || (!p.lat && !p.lng)) return null
+              if (regiaoVista && p.regiao && p.regiao !== regiaoVista) return null
               const marca = respondentes[i][perguntaId] === resposta
               return (
                 <CircleMarker
@@ -535,6 +654,7 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
             })}
           {REGIOES.features.map((f) => {
             const reg = f.properties.regiao
+            if (reg !== regiaoVista) return null
             const r = porRegiao.get(reg)
             const v = r?.base ? formatPct(r.pct) : '—'
             const cls = reg === regA ? ' a' : reg === regB ? ' b' : ''
