@@ -476,8 +476,14 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
                 `<span class="mr-tt-meta">${p.n_pontos} entrevista${p.n_pontos === 1 ? '' : 's'}</span>` +
                 (p.nomes ? `<br/><span class="mr-tt-meta">Bairro informado: ${p.nomes}</span>` : '')
 
-              // Desktop: hover; Mobile: tap abre o mesmo mini card
-              layer.bindTooltip(html, { sticky: true, className: 'mr-tooltip', opacity: 1 })
+              // Um único card no toque (popup). Tooltip só no hover do desktop.
+              const soToque =
+                L.Browser.mobile ||
+                (typeof window !== 'undefined' && window.matchMedia('(hover: none), (pointer: coarse)').matches)
+
+              if (!soToque) {
+                layer.bindTooltip(html, { sticky: true, className: 'mr-tooltip', opacity: 1 })
+              }
               layer.bindPopup(html, {
                 className: 'mr-popup',
                 maxWidth: 280,
@@ -494,9 +500,10 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
                 mouseout: () => setHover(null),
                 click: (e) => {
                   L.DomEvent.stopPropagation(e)
+                  layer.closeTooltip()
                   if (p.regiao) escolherRef.current(p.regiao)
-                  // Garante o card no toque (tooltip de hover não existe no mobile)
-                  layer.openPopup(e.latlng)
+                  // bindPopup já abre o card; openPopup reforça no mobile sem duplicar
+                  if (soToque) layer.openPopup(e.latlng)
                 },
               })
             }}
