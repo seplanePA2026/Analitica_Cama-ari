@@ -1201,6 +1201,67 @@ select {
   box-sizing: border-box;
 }
 
+.rel-card-regiao {
+  grid-column: 1 / -1;
+}
+
+.rel-regioes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.rel-regiao-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rel-regiao-item:last-of-type {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.rel-regiao-hbar .hbar-label {
+  white-space: normal;
+  min-width: 0;
+}
+
+.rel-regiao-sub {
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.rel-regiao-bairros {
+  margin-left: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.rel-regiao-bairros-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--ink-2);
+  margin-bottom: 4px;
+}
+
+.rel-regiao-bairros-lista {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.rel-regiao-tbl {
+  margin-top: 4px;
+}
+
 .rel-card h3 {
   font-size: 0.88rem;
   font-weight: 800;

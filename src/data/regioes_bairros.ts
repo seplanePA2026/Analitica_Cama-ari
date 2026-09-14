@@ -140,6 +140,27 @@ export function infoRegiao(id: string): RegiaoInfo | undefined {
   return REGIOES_INFO.find((r) => r.id === id)
 }
 
+/** Nome curto ao lado da região (ex.: SEDE, Distrito de Abrantes). */
+export function subtituloRegiao(id: string): string {
+  if (id === 'Região 1' || id === 'Região 2' || id === 'Região 3') return 'SEDE'
+  if (id === 'Região 4') return 'Distrito de Abrantes'
+  if (id === 'Região 5') return 'Distrito de Monte Gordo'
+  const info = infoRegiao(id)
+  if (!info) return ''
+  const parts = info.titulo.split(/[/—–-]/).map((s) => s.trim())
+  return parts.length > 1 ? parts.slice(1).join(' — ') : ''
+}
+
+/** Ex.: "Região 1 · SEDE" */
+export function rotuloRegiaoCompleto(id: string): string {
+  const sub = subtituloRegiao(id)
+  return sub ? `${id} · ${sub}` : id
+}
+
+export function bairrosDaRegiao(id: string): string[] {
+  return infoRegiao(id)?.bairros ?? []
+}
+
 export function normalizaNome(s: string) {
   return s
     .normalize('NFD')

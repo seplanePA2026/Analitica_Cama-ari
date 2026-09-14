@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { Pergunta, TabelaData } from '../types'
+import { bairrosDaRegiao, rotuloRegiaoCompleto } from '../data/regioes_bairros'
 
 const BRAND = { r: 136, g: 88, b: 240 }
 const INK = { r: 26, g: 33, b: 64 }
@@ -305,12 +306,14 @@ export async function exportRelatorioPdfBranded(
     y += titleH
 
     const maxPct = Math.max(...items.map((i) => i.pct), 1)
-    const labelColW = 62
+    const labelColW = p.id === 'regiao' ? 58 : 62
     const barMaxW = contentW - labelColW - 28
+    const isRegiao = p.id === 'regiao'
 
     for (let i = 0; i < items.length; i++) {
       const it = items[i]
-      const labelLines = doc.splitTextToSize(it.label, labelColW - 2)
+      const displayLabel = isRegiao ? rotuloRegiaoCompleto(it.label) : it.label
+      const labelLines = doc.splitTextToSize(displayLabel, labelColW - 2)
       const rowH = Math.max(6, labelLines.length * 3.4 + 1.5)
       y = ensureSpace(doc, y, rowH + 1, pageH, footerReserve)
 
@@ -332,6 +335,21 @@ export async function exportRelatorioPdfBranded(
         barY + 3,
       )
       y += rowH
+
+      if (isRegiao) {
+        const bairros = bairrosDaRegiao(it.label)
+        if (bairros.length) {
+          const bloco = `Bairros (${bairros.length}): ${bairros.join('; ')}`
+          const bLines = doc.splitTextToSize(bloco, contentW - 8)
+          const bH = bLines.length * 3.1 + 2
+          y = ensureSpace(doc, y, bH + 1, pageH, footerReserve)
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(6.5)
+          doc.setTextColor(MUTED.r, MUTED.g, MUTED.b)
+          doc.text(bLines, marginX + 4, y + 2.2)
+          y += bH
+        }
+      }
     }
 
     y += 2
@@ -340,12 +358,22 @@ export async function exportRelatorioPdfBranded(
     autoTable(doc, {
       startY: y,
       margin: { left: marginX + 1, right: marginX + 1, bottom: footerReserve },
-      head: [['Resposta', 'Valor', '%']],
-      body: items.map((it) => [
-        it.label,
-        String(it.n),
-        `${it.pct.toFixed(1).replace('.', ',')}%`,
-      ]),
+      head: [isRegiao ? ['Região', 'Bairros', 'Valor', '%'] : ['Resposta', 'Valor', '%']],
+      body: items.map((it) => {
+        if (!isRegiao) {
+          return [
+            it.label,
+            String(it.n),
+            `${it.pct.toFixed(1).replace('.', ',')}%`,
+          ]
+        }
+        return [
+          rotuloRegiaoCompleto(it.label),
+          bairrosDaRegiao(it.label).join('; ') || '—',
+          String(it.n),
+          `${it.pct.toFixed(1).replace('.', ',')}%`,
+        ]
+      }),
       styles: {
         fontSize: 7.5,
         cellPadding: 1.4,
@@ -360,11 +388,18 @@ export async function exportRelatorioPdfBranded(
         textColor: 255,
         fontStyle: 'bold',
       },
-      columnStyles: {
-        0: { cellWidth: contentW - 40 },
-        1: { halign: 'right', cellWidth: 18 },
-        2: { halign: 'right', cellWidth: 18 },
-      },
+      columnStyles: isRegiao
+        ? {
+            0: { cellWidth: 42 },
+            1: { cellWidth: contentW - 42 - 36 },
+            2: { halign: 'right', cellWidth: 18 },
+            3: { halign: 'right', cellWidth: 18 },
+          }
+        : {
+            0: { cellWidth: contentW - 40 },
+            1: { halign: 'right', cellWidth: 18 },
+            2: { halign: 'right', cellWidth: 18 },
+          },
       theme: 'grid',
       tableWidth: contentW - 2,
       rowPageBreak: 'auto',
