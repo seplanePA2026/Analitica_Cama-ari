@@ -184,17 +184,19 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
   const [mostrarPontos, setMostrarPontos] = useState(false)
   const [zoom, setZoom] = useState(11)
   const [regiaoVista, setRegiaoVista] = useState(REGIOES_INFO[0]?.id ?? 'Região 1')
+  const [verPorRegiao, setVerPorRegiao] = useState(false)
 
   const pergunta = indicadores.find((p) => p.id === perguntaId)
   const regiaoAtual = infoRegiao(regiaoVista) ?? REGIOES_INFO[0]
   const bairrosOficiais = regiaoAtual?.bairros ?? []
 
   const rotulosBairros = useMemo(() => {
+    if (!verPorRegiao) return []
     return BAIRRO_CENTROS.filter((b) => {
       if (b.regiao === regiaoVista) return true
       return bairroPertenceALista(b.bairro, bairrosOficiais)
     })
-  }, [regiaoVista, bairrosOficiais])
+  }, [verPorRegiao, regiaoVista, bairrosOficiais])
 
   const opcoes = useMemo(() => {
     const uniq = (k: keyof Filtros) =>
@@ -274,13 +276,13 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
 
   function estiloRegiao(reg: string): L.PathOptions {
     const sel = reg === regA ? COR_A : reg === regB ? COR_B : null
-    const foco = reg === regiaoVista
-    const dim = reg !== regiaoVista
+    const foco = verPorRegiao && reg === regiaoVista
+    const dim = verPorRegiao && reg !== regiaoVista
     return {
       fillColor: corDe(reg),
       fillOpacity: dim ? 0.22 : hover === reg ? 0.92 : 0.78,
       color: sel ?? (foco ? regiaoAtual?.cor ?? '#1a2140' : '#1a2140'),
-      weight: sel ? 3.5 : foco ? 3 : hover === reg ? 2.2 : 1,
+      weight: sel ? 3.5 : foco ? 3 : hover === reg ? 2.2 : 1.2,
       opacity: dim ? 0.25 : sel ? 1 : 0.55,
     }
   }
@@ -326,9 +328,26 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
     <div className="mr-layout">
       <aside className="mr-side">
         <section className="mr-card mr-regiao-card">
+          <div className="mr-regiao-toolbar">
+            <button
+              type="button"
+              className={`mr-regiao-toggle${verPorRegiao ? ' on' : ''}`}
+              aria-pressed={verPorRegiao}
+              onClick={() => setVerPorRegiao((v) => !v)}
+            >
+              {verPorRegiao ? 'Desativar visualização por região' : 'Ativar visualização por região'}
+            </button>
+          </div>
           <label className="mr-field">
             Região
-            <select value={regiaoVista} onChange={(e) => setRegiaoVista(e.target.value)}>
+            <select
+              value={regiaoVista}
+              onChange={(e) => {
+                setRegiaoVista(e.target.value)
+                setVerPorRegiao(true)
+              }}
+              disabled={!verPorRegiao}
+            >
               {REGIOES_INFO.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.titulo}
@@ -336,7 +355,7 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
               ))}
             </select>
           </label>
-          {regiaoAtual && (
+          {verPorRegiao && regiaoAtual && (
             <div className="mr-regiao-desc">
               <div className="mr-regiao-head" style={{ background: regiaoAtual.cor, color: regiaoAtual.corTexto }}>
                 <span className="mr-regiao-pill">{regiaoAtual.titulo}</span>
@@ -353,6 +372,11 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
                 ))}
               </ul>
             </div>
+          )}
+          {!verPorRegiao && (
+            <p className="meta mr-regiao-hint">
+              Ative para focar uma região, ver a lista de bairros e os nomes no mapa.
+            </p>
           )}
         </section>
 
@@ -537,8 +561,17 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
 
       <div className="map-frame mr-map">
         {modoToggle}
+        <button
+          type="button"
+          className={`mr-ver-regiao-map${verPorRegiao ? ' on' : ''}`}
+          aria-pressed={verPorRegiao}
+          title={verPorRegiao ? 'Desativar visualização por região' : 'Ativar visualização por região'}
+          onClick={() => setVerPorRegiao((v) => !v)}
+        >
+          {verPorRegiao ? 'Por região: ON' : 'Por região'}
+        </button>
         <MapContainer center={[-12.7, -38.3]} zoom={11} zoomSnap={0.5} scrollWheelZoom style={{ height: '100%', width: '100%' }}>
-          <MapaAjuste regiaoFoco={regiaoVista} />
+          <MapaAjuste regiaoFoco={verPorRegiao ? regiaoVista : ''} />
           <ZoomWatch onZoom={setZoom} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -551,10 +584,22 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
             interactive={false}
           />
           <GeoJSON
-            key={`bairros-${regiaoVista}`}
+            key={`bairros-${verPorRegiao ? regiaoVista : 'todas'}`}
             data={BAIRROS}
             style={(f) => {
               const p = (f as Feature<Geometry, BairroProps>).properties
+              if (!verPorRegiao) {
+                return p.regiao
+                  ? { color: '#ffffff', weight: 0.7, opacity: 0.8, fillOpacity: 0 }
+                  : {
+                      color: '#8a92ae',
+                      weight: 0.8,
+                      opacity: 0.9,
+                      dashArray: '3 3',
+                      fillColor: SEM_REGIAO,
+                      fillOpacity: 0.45,
+                    }
+              }
               const naFoco =
                 p.regiao === regiaoVista || bairroPertenceALista(p.bairro, bairrosOficiais)
               if (!p.regiao && !naFoco) {
@@ -577,8 +622,7 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
             onEachFeature={(f, layer) => {
               const p = f.properties as BairroProps
               const html =
-                `<strong>${p.bairro}</strong><br/>${p.regiao ?? 'Sem região definida'}<br/>` +
-                `<span class="mr-tt-meta">${p.n_pontos} entrevista${p.n_pontos === 1 ? '' : 's'}</span>` +
+                `<strong>${p.bairro}</strong><br/>${p.regiao ?? 'Sem região definida'}` +
                 (p.nomes ? `<br/><span class="mr-tt-meta">Bairro informado: ${p.nomes}</span>` : '')
 
               const soToque =
@@ -606,7 +650,7 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
                   L.DomEvent.stopPropagation(e)
                   layer.closeTooltip()
                   if (p.regiao) {
-                    setRegiaoVista(p.regiao)
+                    if (verPorRegiao) setRegiaoVista(p.regiao)
                     escolherRef.current(p.regiao)
                   }
                   if (soToque) layer.openPopup(e.latlng)
@@ -619,24 +663,25 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
             interactive={false}
             style={{ color: '#1a2140', weight: 2.2, opacity: 0.85, fill: false }}
           />
-          {rotulosBairros.map((b) => (
-            <Marker
-              key={`bl-${b.id}-${regiaoVista}`}
-              position={b.centro}
-              interactive={false}
-              icon={L.divIcon({
-                className: 'mr-bairro-label-wrap',
-                html: `<div class="mr-bairro-label">${b.bairro}</div>`,
-                iconSize: [1, 1],
-                iconAnchor: [0, 0],
-              })}
-            />
-          ))}
+          {verPorRegiao &&
+            rotulosBairros.map((b) => (
+              <Marker
+                key={`bl-${b.id}-${regiaoVista}`}
+                position={b.centro}
+                interactive={false}
+                icon={L.divIcon({
+                  className: 'mr-bairro-label-wrap',
+                  html: `<div class="mr-bairro-label">${b.bairro}</div>`,
+                  iconSize: [1, 1],
+                  iconAnchor: [0, 0],
+                })}
+              />
+            ))}
           {mostrarPontos &&
             filtradosIdx.map((i) => {
               const p = pontos[i]
               if (!p || (!p.lat && !p.lng)) return null
-              if (regiaoVista && p.regiao && p.regiao !== regiaoVista) return null
+              if (verPorRegiao && regiaoVista && p.regiao && p.regiao !== regiaoVista) return null
               const marca = respondentes[i][perguntaId] === resposta
               return (
                 <CircleMarker
@@ -655,18 +700,19 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
             })}
           {REGIOES.features.map((f) => {
             const reg = f.properties.regiao
-            if (reg !== regiaoVista) return null
+            if (verPorRegiao && reg !== regiaoVista) return null
             const r = porRegiao.get(reg)
             const v = r?.base ? formatPct(r.pct) : '—'
             const cls = reg === regA ? ' a' : reg === regB ? ' b' : ''
-            const [dx, dy] = zoom < ZOOM_SEM_DESLOCA ? (DESLOCA[reg] ?? [0, 0]) : [0, 0]
+            const [dx, dy] =
+              !verPorRegiao && zoom < ZOOM_SEM_DESLOCA ? (DESLOCA[reg] ?? [0, 0]) : [0, 0]
             const linha =
               dx || dy
                 ? `<svg class="mr-leader" width="1" height="1"><line x1="0" y1="0" x2="${dx}" y2="${dy}" /></svg><i class="mr-leader-dot"></i>`
                 : ''
             return (
               <Marker
-                key={`${reg}-${v}-${cls}-${dx}`}
+                key={`${reg}-${v}-${cls}-${dx}-${verPorRegiao}`}
                 position={f.properties.label}
                 interactive={false}
                 icon={L.divIcon({
