@@ -626,8 +626,9 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
               interactive={false}
               icon={L.divIcon({
                 className: 'mr-bairro-label-wrap',
-                html: `<span class="mr-bairro-label">${b.bairro}</span>`,
-                iconSize: [0, 0],
+                html: `<div class="mr-bairro-label">${b.bairro}</div>`,
+                iconSize: [1, 1],
+                iconAnchor: [0, 0],
               })}
             />
           ))}

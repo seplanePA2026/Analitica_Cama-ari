@@ -2189,25 +2189,34 @@ select {
 .mr-bairro-label-wrap {
   background: none !important;
   border: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: visible !important;
 }
 
 .mr-bairro-label {
-  display: inline-block;
+  position: absolute;
+  left: 0;
+  top: 0;
   transform: translate(-50%, -50%);
-  max-width: 110px;
-  padding: 2px 6px;
+  display: inline-block;
+  width: max-content;
+  max-width: 130px;
+  padding: 3px 7px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(26, 33, 64, 0.14);
   box-shadow: 0 4px 12px -8px rgba(26, 33, 64, 0.45);
   color: #1a2140;
   font-family: 'Montserrat', system-ui, sans-serif;
-  font-size: 0.62rem;
+  font-size: 0.65rem;
   font-weight: 700;
   line-height: 1.2;
   text-align: center;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
+  word-break: keep-all;
+  overflow-wrap: normal;
   pointer-events: none;
 }
 
@@ -2220,9 +2229,9 @@ select {
   }
 
   .mr-bairro-label {
-    font-size: 0.58rem;
-    max-width: 88px;
-    padding: 1px 4px;
+    font-size: 0.6rem;
+    max-width: 110px;
+    padding: 2px 5px;
   }
 }
 
