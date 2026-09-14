@@ -12,4 +12,4 @@ Sempre que alterar arquivos deste projeto (código, CSS, dados, configs):
 3. Não espere o usuário pedir commit/push de novo — isso já é a regra padrão.
 4. Mensagens de commit curtas, em português, focadas no "porquê".
 5. Não alterar `git config`. Não usar `--force` em `main` sem pedido explícito.
-6. Se o usuário também quiser o site no ar, rode `npm run build` e `npx wrangler deploy` após o push (ou quando pedir atualizar o Cloudflare).
+6. Após o push, atualize também o site no Cloudflare: `npm run build` e `npx wrangler deploy` (o usuário confere no workers.dev).
