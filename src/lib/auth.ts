@@ -7,7 +7,7 @@ export type Conta = {
 /** Únicos usuários autorizados no painel. */
 export const CONTAS: readonly Conta[] = [
   { email: 'geraldo@gmail.com', senha: 'Analitica2026', nome: 'Geraldo' },
-  { email: 'joseremelo@gmail.com', senha: 'Analitica2026', nome: 'Joseremelo' },
+  { email: 'joseremelo@gmail.com', senha: '123456', nome: 'Joseremelo' },
 ] as const
 
 export function autenticar(usuario: string, senha: string): Conta | null {
