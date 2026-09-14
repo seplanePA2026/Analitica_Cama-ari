@@ -95,7 +95,7 @@ export function VistaAcumulativo({ respondentes, opcoes, regioes }: Props) {
           <div className="meta">Total acumulado da pesquisa</div>
           <div className="acum-total">{formatVal(result.base)}</div>
           <div className="meta">
-            {formatVal(result.top3.reduce((s, t) => s + t.n, 0))} votos nos {result.top3.length}{' '}
+            {formatVal(result.top3.reduce((s, t) => s + t.n, 0))} respostas nos {result.top3.length}{' '}
             principais · base {formatVal(result.base)} entrevistas
             {opcao ? ` · ${opcao.title}` : ''}
           </div>

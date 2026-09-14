@@ -1,4 +1,5 @@
 import type { Pergunta, Respondente, ResultItem } from '../types'
+import { pct1 } from './pct'
 
 export type RelatorioFiltros = {
   sexo: string
@@ -34,21 +35,42 @@ export function filterRespondentes(rows: Respondente[], f: RelatorioFiltros) {
   })
 }
 
-function aggregateField(rows: Respondente[], field: string): ResultItem[] {
+/**
+ * Agrega respostas.
+ * - Se a pergunta original era por quantidade → ranking por n.
+ * - Se era por categorias (idade, avaliação…) → mantém a ordem original.
+ */
+function aggregateField(
+  rows: Respondente[],
+  field: string,
+  ordemOriginal: string[],
+  porQuantidade: boolean,
+): ResultItem[] {
   const counts = new Map<string, number>()
   for (const r of rows) {
     const v = r[field]
     if (!v) continue
     counts.set(v, (counts.get(v) ?? 0) + 1)
   }
-  const total = [...counts.values()].reduce((s, n) => s + n, 0) || 1
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([label, n]) => ({
-      label,
-      n,
-      pct: Math.round((1000 * n) / total) / 10,
-    }))
+  const total = [...counts.values()].reduce((s, n) => s + n, 0)
+  const ordem = new Map(ordemOriginal.map((l, i) => [l, i]))
+  const idx = (l: string) => ordem.get(l) ?? Number.MAX_SAFE_INTEGER
+
+  const labels = [...counts.keys()].sort((a, b) => {
+    if (porQuantidade) {
+      const ca = counts.get(a)!
+      const cb = counts.get(b)!
+      if (ca !== cb) return cb - ca
+      return idx(a) - idx(b) || a.localeCompare(b, 'pt-BR')
+    }
+    return idx(a) - idx(b) || a.localeCompare(b, 'pt-BR')
+  })
+
+  return labels.map((label) => ({
+    label,
+    n: counts.get(label)!,
+    pct: pct1(counts.get(label)!, total),
+  }))
 }
 
 export function perguntasComFiltro(
@@ -61,12 +83,13 @@ export function perguntasComFiltro(
     return { perguntas: base, n: rows.length }
   }
   const perguntas = base.map((p) => {
-    const items = aggregateField(filtered, p.id)
+    const ordemOriginal = p.items.map((it) => it.label)
+    const porQuantidade = p.items.every((it, i, a) => i === 0 || a[i - 1].n >= it.n)
+    const items = aggregateField(filtered, p.id, ordemOriginal, porQuantidade)
     return {
       ...p,
       n: items.reduce((s, it) => s + it.n, 0),
       items,
-      // keep original cruzamentos structure empty-safe — hide detailed cruz when filtered
       cruzamentos: p.cruzamentos,
     }
   })

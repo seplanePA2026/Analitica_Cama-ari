@@ -1,4 +1,5 @@
 import type { ResultItem } from '../types'
+import { pct1 } from './pct'
 
 export type Respondente = {
   data: string
@@ -66,7 +67,7 @@ export function buildAcumulativo(
   const totais: ResultItem[] = ranked.map(([label, n]) => ({
     label,
     n,
-    pct: round1((100 * n) / base),
+    pct: pct1(n, base),
   }))
   const top3 = totais.slice(0, topN)
 
@@ -107,10 +108,6 @@ export function buildAcumulativo(
     base: [...overall.values()].reduce((s, n) => s + n, 0),
     top3,
   }
-}
-
-function round1(n: number) {
-  return Math.round(n * 10) / 10
 }
 
 export function uniqueValues(rows: Respondente[], key: keyof Respondente | string): string[] {

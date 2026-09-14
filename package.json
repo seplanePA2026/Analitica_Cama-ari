@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "data": "python ../_build_data.py",
+    "data": "echo Dados em src/data/resultados.json — atualize a partir de bd-camacari-resultados.xlsx",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {

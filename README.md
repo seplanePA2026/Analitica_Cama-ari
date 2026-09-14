@@ -1,27 +1,37 @@
 # Tracking Municipal — Camaçari 2026
 
-Painel analítico em React com a mesma estrutura do relatório HTML (temas · perguntas · resultados).
+Painel analítico em React (Vite) com temas, perguntas, mapa, relatório, tabela e acumulativo.
 
 ## Como rodar
 
+Na raiz deste repositório:
+
 ```bash
-cd tracking-camacari
 npm install
 npm run dev
 ```
 
-## Regenerar dados do Excel
+## Dados
 
-Na pasta raiz do projeto (onde está o `.xlsx`):
+Os resultados agregados estão em `src/data/resultados.json` (importados pelo app no build).
+
+Fontes de referência no repositório:
+
+- `bd-camacari-resultados.xlsx`
+- `QUESTIONÁRIO CODIFICADO  TRACKING  CAMAÇARI   2026.docx`
+
+Não há cópia pública em `/data/` — o JSON não fica exposto via URL estática.
+
+## Deploy
 
 ```bash
-python _build_data.py
+npm run build
+npx wrangler deploy
 ```
-
-Isso atualiza `src/data/resultados.json` e `public/data/resultados.json`.
 
 ## Estrutura
 
-- Esquerda: temas do questionário
-- Centro: perguntas do tema
-- Direita: KPIs + gráficos (barras / pizza / linha por dia) + tabela
+- Mapa: pontos e regiões
+- Listas: temas · perguntas · KPIs · gráficos
+- Relatório: cards + cruzamentos + filtros
+- Tabela / Acumulativo / exportações Excel e PDF

@@ -11,6 +11,7 @@ import { VistaAcumulativo } from './components/VistaAcumulativo'
 import { VistaMapa } from './components/VistaMapa'
 import { VistaRelatorio } from './components/VistaRelatorio'
 import { VistaTabela } from './components/VistaTabela'
+import { sessaoValida } from './lib/auth'
 import {
   exportRelatorioExcel,
   exportRelatorioPdfBranded,
@@ -24,10 +25,20 @@ import {
   uniqueSorted,
   type RelatorioFiltros,
 } from './lib/filters'
-import type { Aba, Pergunta, Resultados } from './types'
+import type { Aba, MapaPonto, Pergunta, Resultados } from './types'
 
 const D = data as Resultados
 const AUTH_KEY = 'tracking-camacari-auth'
+
+/** Descarta coordenadas inválidas (ex.: entrevista 523 em 0,0). */
+const MAPA_PONTOS: MapaPonto[] = D.mapa.filter(
+  (p) =>
+    Number.isFinite(p.lat) &&
+    Number.isFinite(p.lng) &&
+    !(p.lat === 0 && p.lng === 0) &&
+    Math.abs(p.lat) > 0.01 &&
+    Math.abs(p.lng) > 0.01,
+)
 
 type Modo = 'graf' | 'linha' | 'tabela'
 type AuthUser = { nome: string; usuario: string }
@@ -38,10 +49,24 @@ function loadAuth(): AuthUser | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as AuthUser
     if (!parsed?.nome || !parsed?.usuario) return null
+    if (!sessaoValida(parsed.usuario)) {
+      localStorage.removeItem(AUTH_KEY)
+      return null
+    }
     return parsed
   } catch {
     return null
   }
+}
+
+function agoraLabel() {
+  return new Date().toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 export default function App() {
@@ -145,6 +170,7 @@ export default function App() {
   }, [aba, doTema, cur, tema])
 
   function onLogin(nome: string, usuario: string) {
+    if (!sessaoValida(usuario)) return
     const next = { nome, usuario }
     localStorage.setItem(AUTH_KEY, JSON.stringify(next))
     setUser(next)
@@ -155,12 +181,16 @@ export default function App() {
     setUser(null)
   }
 
+  /** Só a aba Relatório aplica filtros do Relatório na exportação. */
+  const exportPerguntas = aba === 'relatorio' ? perguntasFiltradas : D.perguntas
+  const exportN = aba === 'relatorio' ? nFiltrado : D.meta.n_entrevistas
+
   function onExportExcel() {
     if (aba === 'tabela') {
       exportTabelaExcel(D.tabela, 'bd-camacari-resultados.xlsx')
       return
     }
-    exportRelatorioExcel(perguntasFiltradas, 'relatorio-camacari.xlsx')
+    exportRelatorioExcel(exportPerguntas, 'relatorio-camacari.xlsx')
   }
 
   async function onExportPdf() {
@@ -173,11 +203,11 @@ export default function App() {
         })
         return
       }
-      await exportRelatorioPdfBranded(perguntasFiltradas, {
+      await exportRelatorioPdfBranded(exportPerguntas, {
         titulo: D.meta.titulo,
         subtitulo: D.meta.subtitulo,
-        n_entrevistas: nFiltrado,
-        gerado_em: D.meta.gerado_em,
+        n_entrevistas: exportN,
+        gerado_em: agoraLabel(),
       })
     } finally {
       setExportBusy(false)
@@ -266,7 +296,7 @@ export default function App() {
 
           {aba === 'mapa' && (
             <VistaMapa
-              pontos={D.mapa}
+              pontos={MAPA_PONTOS}
               respondentes={D.respondentes}
               perguntas={D.perguntas}
               regioes={D.filtros.regioes}

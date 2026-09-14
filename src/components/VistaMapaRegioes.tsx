@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import L from 'leaflet'
 import { CircleMarker, GeoJSON, MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import type { Feature, FeatureCollection, Geometry } from 'geojson'
 import type { MapaPonto, Pergunta, Respondente } from '../types'
 import malha from '../data/regioes_pesquisa.json'
 import { formatPct, formatVal } from './BarraHorizontal'
+import { pct1 } from '../lib/pct'
 import 'leaflet/dist/leaflet.css'
 
 type RegiaoProps = { regiao: string; n_bairros: number; pop_2024: number; bairros: string; label: [number, number] }
@@ -55,13 +56,14 @@ type Props = {
   perguntas: Pergunta[]
   regioes: string[]
   datas: { iso: string; label: string }[]
+  modoToggle?: ReactNode
 }
 
 type Contagem = { label: string; n: number; pct: number }
 type ResultadoRegiao = { regiao: string; base: number; n: number; pct: number; itens: Contagem[] }
 
 function pct(n: number, base: number) {
-  return base ? Math.round((1000 * n) / base) / 10 : 0
+  return pct1(n, base)
 }
 
 function contar(rows: Respondente[], campo: string): { base: number; itens: Contagem[] } {
@@ -121,7 +123,7 @@ function ZoomWatch({ onZoom }: { onZoom: (z: number) => void }) {
   return null
 }
 
-export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, datas }: Props) {
+export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, datas, modoToggle }: Props) {
   const indicadores = useMemo(() => perguntas.filter((p) => p.id !== 'regiao' && p.id !== 'dia'), [perguntas])
   const temas = useMemo(() => [...new Set(indicadores.map((p) => p.tema))], [indicadores])
   const [perguntaId, setPerguntaId] = useState(
@@ -445,6 +447,7 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
       </aside>
 
       <div className="map-frame mr-map">
+        {modoToggle}
         <MapContainer center={[-12.7, -38.3]} zoom={11} zoomSnap={0.5} scrollWheelZoom style={{ height: '100%', width: '100%' }}>
           <MapaAjuste />
           <ZoomWatch onZoom={setZoom} />
@@ -468,17 +471,33 @@ export function VistaMapaRegioes({ pontos, respondentes, perguntas, regioes, dat
             }}
             onEachFeature={(f, layer) => {
               const p = f.properties as BairroProps
-              layer.bindTooltip(
+              const html =
                 `<strong>${p.bairro}</strong><br/>${p.regiao ?? 'Sem região definida'}<br/>` +
-                  `<span class="mr-tt-meta">${p.n_pontos} entrevista${p.n_pontos === 1 ? '' : 's'}</span>` +
-                  (p.nomes ? `<br/><span class="mr-tt-meta">Bairro informado: ${p.nomes}</span>` : ''),
-                { sticky: true, className: 'mr-tooltip', opacity: 1 },
-              )
-              if (!p.regiao) return
+                `<span class="mr-tt-meta">${p.n_pontos} entrevista${p.n_pontos === 1 ? '' : 's'}</span>` +
+                (p.nomes ? `<br/><span class="mr-tt-meta">Bairro informado: ${p.nomes}</span>` : '')
+
+              // Desktop: hover; Mobile: tap abre o mesmo mini card
+              layer.bindTooltip(html, { sticky: true, className: 'mr-tooltip', opacity: 1 })
+              layer.bindPopup(html, {
+                className: 'mr-popup',
+                maxWidth: 280,
+                minWidth: 140,
+                closeButton: true,
+                autoPan: true,
+                autoPanPadding: [48, 48],
+              })
+
               layer.on({
-                mouseover: () => setHover(p.regiao),
+                mouseover: () => {
+                  if (p.regiao) setHover(p.regiao)
+                },
                 mouseout: () => setHover(null),
-                click: () => escolherRef.current(p.regiao!),
+                click: (e) => {
+                  L.DomEvent.stopPropagation(e)
+                  if (p.regiao) escolherRef.current(p.regiao)
+                  // Garante o card no toque (tooltip de hover não existe no mobile)
+                  layer.openPopup(e.latlng)
+                },
               })
             }}
           />
